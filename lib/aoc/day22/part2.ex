@@ -1,4 +1,4 @@
-defmodule AOC.Day22.Part1 do
+defmodule AOC.Day22.Part2 do
   @boss %{
     :name => "boss",
     :hp => 51,
@@ -31,7 +31,6 @@ defmodule AOC.Day22.Part1 do
   def spells(), do: Keyword.keys(@spells) |> Enum.shuffle()
 
   def example(actions) do
-
     turn(
       @player,
       @boss,
@@ -80,7 +79,7 @@ defmodule AOC.Day22.Part1 do
   def recur([], acc), do: acc
 
   def recur([h | t], acc) do
-    val = _recur(turn(@player, @boss, [h], [], :player), 940, [h])
+    val = _recur(turn(@player, @boss, [h], [], :player), 10000, [h])
 
     recur(t, [val | acc])
   end
@@ -102,11 +101,15 @@ defmodule AOC.Day22.Part1 do
   end
 
   def _recur({player, boss, active_effects}, min, spells) do
-    spell =
-      spells()
-      |> get_spell(active_effects)
+    if player[:hp] <= 1 do
+      _recur(:lose, min, [])
+    else
+      spell =
+        spells()
+        |> get_spell(active_effects)
 
-    _recur(turn(player, boss, [spell], active_effects, :player), min, [spell | spells])
+      _recur(turn(player, boss, [spell], active_effects, :player), min, [spell | spells])
+    end
   end
 
   def get_spell([spell | _], active_effects) when length(active_effects) == 0, do: spell
@@ -139,32 +142,38 @@ defmodule AOC.Day22.Part1 do
   end
 
   def turn(player, boss, [action | t], active_effects, turn) when turn == :player do
-    {boss, active_effects} = tick_effects(boss, active_effects)
-    {player, active_effects} = tick_effects(player, active_effects)
-    # IO.inspect({player, active_effects}, label: :player, limit: :infinity)
+    player = Map.get_and_update!(player, :hp, fn hp -> {hp, hp - 1} end) |> elem(1)
 
-    case check(player, boss) do
-      :win ->
-        :win
+    if player[:hp] <= 0 do
+      :lose
+    else
+      {boss, active_effects} = tick_effects(boss, active_effects)
+      {player, active_effects} = tick_effects(player, active_effects)
+      # IO.inspect({player, active_effects}, label: :player, limit: :infinity)
 
-      :lose ->
-        :lose
+      case check(player, boss) do
+        :win ->
+          :win
 
-      false ->
-        if not Enum.member?(active_effects, action) do
-          case cast(player, boss, @spells[action]) do
-            :not_enough_mana ->
-              :lose
+        :lose ->
+          :lose
 
-            {player, boss} ->
-              turn(player, boss, t, active_effects, :boss)
+        false ->
+          if not Enum.member?(active_effects, action) do
+            case cast(player, boss, @spells[action]) do
+              :not_enough_mana ->
+                :lose
 
-            {player, boss, effect} ->
-              turn(player, boss, t, [effect | active_effects], :boss)
+              {player, boss} ->
+                turn(player, boss, t, active_effects, :boss)
+
+              {player, boss, effect} ->
+                turn(player, boss, t, [effect | active_effects], :boss)
+            end
+          else
+            :cannot_cast
           end
-        else
-          :cannot_cast
-        end
+      end
     end
   end
 
